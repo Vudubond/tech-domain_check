@@ -6,6 +6,7 @@ Created: 08/29/2024
 You can run it without arguments and it will run it on all domains listed in /etc/userdomains
 You can also run it with domain names as arguments to run it only for those domains.
 
+```
 # ./domain_check
 Domain: testdomain.com [ addon ] - ( user1 )
     \_ A Record: 15.197.142.173 -  [ HOSTED ELSEWHERE ]
@@ -21,7 +22,7 @@ Domain: sub.testdomain.com [ sub ] - ( user1 )
 Domain: sub2.someotherdomain.com [ sub ] - ( user2 )
     \_ A Record: 172.241.25.87 -  [ HOSTED HERE ]
 ================================================================================
-
+```
 
 
 # ./domain_check domain1.com domain2.net domain3.com domain4.com domain5.net
