@@ -1,7 +1,9 @@
+```
 Script: domain_check
 Author: Peter Elsner <peter.elsner@webpros.com>
 Purpose: Get information on all domains on a cPanel server.
 Created: 08/29/2024
+```
 
 You can run it without arguments and it will run it on all domains listed in /etc/userdomains
 You can also run it with domain names as arguments to run it only for those domains.
