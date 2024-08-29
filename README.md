@@ -24,7 +24,7 @@ Domain: sub2.someotherdomain.com [ sub ] - ( user2 )
 ================================================================================
 ```
 
-
+```
 # ./domain_check domain1.com domain2.net domain3.com domain4.com domain5.net
 Domain: domain1.com [ addon ] - ( user1 )
     \_ A Record: 64.34.75.145 -  [ HOSTED ELSEWHERE ]
@@ -61,11 +61,13 @@ Domain: domain5.net [ main ] - ( user5 )
     \_ Name Server: ns3.siteocity.com.
     \_ Name Server: ns4.siteocity.com.
 ================================================================================
-
+```
 
 You can also create a report by using tee.
 
+```
 ./domain_check | tee mydomainreport.txt
+```
 
 Then to view the report, use less -R mydomainreport.txt
 
