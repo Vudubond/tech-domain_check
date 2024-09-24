@@ -4,12 +4,18 @@ Author: Peter Elsner <peter.elsner@webpros.com>
 Purpose: Get information on all domains on a cPanel server.
 Created: 08/29/2024
 ```
+HOW TO USE:
+Add the following to your .bashrc file.
 
-You can run it without arguments and it will run it on all domains listed in /etc/userdomains
+```
+alias domain_check="/usr/local/cpanel/3rdparty/bin/perl <(curl -s https://raw.githubusercontent.com/CpanelInc/tech-domain_check/refs/heads/main/domain_check)"
+```
+
+Running it without arguments, will run it on all domains listed in /etc/userdomains
 You can also run it with domain names as arguments to run it only for those domains.
 
 ```
-# ./domain_check
+# domain_check
 Domain: testdomain.com [ addon ] - ( user1 )
     \_ A Record: 15.197.142.173 -  [ HOSTED ELSEWHERE ]
     \_ A Record: 3.33.152.147 -  [ HOSTED ELSEWHERE ]
@@ -27,7 +33,7 @@ Domain: sub2.someotherdomain.com [ sub ] - ( user2 )
 ```
 
 ```
-# ./domain_check domain1.com domain2.net domain3.com domain4.com domain5.net
+# domain_check domain1.com domain2.net domain3.com domain4.com domain5.net
 Domain: domain1.com [ addon ] - ( user1 )
     \_ A Record: 64.34.75.145 -  [ HOSTED ELSEWHERE ]
     \_ MX Record: 0 craigrowland.com. -  [ HOSTED ELSEWHERE ]
@@ -68,7 +74,7 @@ Domain: domain5.net [ main ] - ( user5 )
 You can also create a report by using tee.
 
 ```
-./domain_check | tee mydomainreport.txt
+domain_check | tee mydomainreport.txt
 ```
 
 Then to view the report, use less -R mydomainreport.txt

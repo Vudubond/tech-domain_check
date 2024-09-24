@@ -4,6 +4,7 @@
 use strict;
 use LWP::UserAgent;
 use NetAddr::IP;
+use Cpanel::Validate::IP();
 use Term::ANSIColor qw(:constants);
 $Term::ANSIColor::AUTORESET = 1;
 
@@ -22,7 +23,9 @@ if ( !@domains ) {
 	}
 }
 foreach my $domain(@domains) {
-	#print CYAN "Domain: $domain\n";
+    my $exists = qx[ grep $domain '/etc/userdomains' ];
+    print "$domain is not on this server\n" unless ( $exists );
+    exit unless ( $exists );
 	my ($username)=(split(/\s+/,qx[ whmapi1 getdomainowner domain=$domain | grep 'user:' ] ))[2];
 	chomp( $username );
 	my $domain_type = get_domain_type( $domain );
@@ -68,8 +71,26 @@ sub get_mx_record {
 	for my $mx(@mxrecords) {
 		chomp($mx);
 		my ( $priority, $mxrec ) = ( split( /\s+/, $mx ));
+		return unless( $mxrec );
 		my $exists_here = check_if_ip_on_server( $mxrec ) if ( $mxrec );
-		print BOLD BLUE "\t\\_ MX Record: $mx - $exists_here\n";
+		# Check if $mxrec is a valid IP
+		my $isValidIP = (Cpanel::Validate::IP::is_valid_ip($mxrec)) ? 1 : 0;
+		unless( $isValidIP ) {
+			# Get A record of $mxrec
+			print BOLD BLUE "\t\\_ MX Record: $mxrec\n";
+			my @arecords = qx[ dig +short $mxrec A ];
+			for my $arecord(@arecords ) {
+				chomp( $arecord );
+				my $exists_here = check_if_ip_on_server( $arecord ) if ( $arecord );
+				if ( $arecord =~ m/[0-9\.]/ ) {
+					print YELLOW "\t\t\\_ A Record: $arecord - $exists_here\n" unless( $arecord =~ m/[a-z]/ );
+				}
+				if ( $arecord =~ m/[a-z].*/ ) {
+					print YELLOW "\t\t\\_ CNAME Record: $arecord - $exists_here\n" unless( $arecord =~ m/[0-9]/ );
+				}
+				print RED "\t\t\\_ No A record found\n" unless( $arecord );
+			}
+		}
 	}
 }
 
