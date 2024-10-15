@@ -1,5 +1,6 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
 # CX-1105 - Request from Kyle P. domain_check
+# Made By Orlando @Clausweb
 
 use strict;
 use LWP::UserAgent;
@@ -9,146 +10,147 @@ use Term::ANSIColor qw(:constants);
 $Term::ANSIColor::AUTORESET = 1;
 
 # Get servers IP addresses
-my @ips=qx[ whmapi1 listips | grep 'public_ip:' | awk '{print $2}' ];
+my @ips = qx[ whmapi1 listips | grep 'public_ip:' | awk '{print \$2}' ];
 
-my @domains=@ARGV;
+my @domains = @ARGV;
 if ( !@domains ) {
-	# Open up /etc/userdomains and get all domains.
-	open( my $fh, '<', '/etc/userdomains' ) or return 0;
-	while (<$fh>) {
-		my ( $domain ) = (split( /\:/, $_ ))[0];
-		next if ( $domain eq '*' );
-		chomp( $domain );
-		push @domains, $domain;
-	}
+    # Open up /etc/userdomains and get all domains.
+    open( my $fh, '<', '/etc/userdomains' ) or return 0;
+    while (<$fh>) {
+        my ( $domain ) = (split( /\:/, $_ ))[0];
+        next if ( $domain eq '*' );
+        chomp( $domain );
+        push @domains, $domain;
+    }
 }
-foreach my $domain(@domains) {
+
+foreach my $domain (@domains) {
     my $exists = qx[ grep $domain '/etc/userdomains' ];
     print "$domain is not on this server\n" unless ( $exists );
     exit unless ( $exists );
-	my ($username)=(split(/\s+/,qx[ whmapi1 getdomainowner domain=$domain | grep 'user:' ] ))[2];
-	chomp( $username );
-	my $domain_type = get_domain_type( $domain );
-	print CYAN "Domain: $domain " . WHITE "[ " . YELLOW $domain_type . WHITE " ]" . CYAN " - " . WHITE "( " . BOLD BLUE . $username . WHITE " )\n";
-	check_for_dns_error( $domain );
-	get_a_record( $domain );	
-	get_mx_record ( $domain );
-	get_nameservers( $domain );
+    my ($username) = (split(/\s+/, qx[ whmapi1 getdomainowner domain=$domain | grep 'user:' ]))[2];
+    chomp( $username );
+    my $domain_type = get_domain_type($domain);
+    print CYAN "Domain: $domain " . WHITE "[ " . YELLOW $domain_type . WHITE " ]" . CYAN " - " . WHITE "( " . BOLD BLUE . $username . WHITE " )\n";
+    check_for_dns_error($domain);
+    get_a_record($domain);
+    get_mx_record($domain);
+    get_nameservers($domain);
 }
 
 sub get_nameservers {
-	my $tcDomain = shift;
-	my @nameservers = qx[ dig +short $tcDomain NS ];
-	for my $ns(@nameservers) {
-		chomp( $ns );
-		print WHITE "\t\\_ Name Server: $ns\n";
-	}
-	print "=" x 80;
-	print "\n";
+    my $tcDomain = shift;
+    my @nameservers = qx[ dig +short $tcDomain NS ];
+    for my $ns (@nameservers) {
+        chomp($ns);
+        print WHITE "\t\\_ Name Server: $ns\n";
+    }
+    print "=" x 80;
+    print "\n";
 }
 
 sub get_a_record {
-	my $tcDomain=shift;
-	my @arecords = qx[ dig +short $tcDomain A ];
-	for my $arecord(@arecords ) {
-		chomp( $arecord );
-		my $exists_here = check_if_ip_on_server( $arecord ) if ( $arecord );
-		if ( $arecord =~ m/[0-9\.]/ ) {
-			print YELLOW "\t\\_ A Record: $arecord - $exists_here\n" unless( $arecord =~ m/[a-z]/ );
-		}
-		if ( $arecord =~ m/[a-z].*/ ) {
-			print YELLOW "\t\\_ CNAME Record: $arecord - $exists_here\n" unless( $arecord =~ m/[0-9]/ );
-		}
-		print RED "\t\\_ No A record found\n" unless( $arecord );
-		print "=" x 80 unless( $arecord );
-		print "\n" unless( $arecord );
-	}
+    my $tcDomain = shift;
+    my @arecords = qx[ dig +short $tcDomain A ];
+    for my $arecord (@arecords) {
+        chomp($arecord);
+        my $exists_here = check_if_ip_on_server($arecord) if ($arecord);
+        if ($arecord =~ m/[0-9\.]/) {
+            print YELLOW "\t\\_ A Record: $arecord - $exists_here\n" unless ($arecord =~ m/[a-z]/);
+        }
+        if ($arecord =~ m/[a-z].*/) {
+            print YELLOW "\t\\_ CNAME Record: $arecord - $exists_here\n" unless ($arecord =~ m/[0-9]/);
+        }
+        print RED "\t\\_ No A record found\n" unless ($arecord);
+        print "=" x 80 unless ($arecord);
+        print "\n" unless ($arecord);
+    }
 }
 
 sub get_mx_record {
-	my $tcDomain=shift;
-	my @mxrecords = qx[ dig +short $tcDomain MX ];
-	for my $mx(@mxrecords) {
-		chomp($mx);
-		my ( $priority, $mxrec ) = ( split( /\s+/, $mx ));
-		return unless( $mxrec );
-		my $exists_here = check_if_ip_on_server( $mxrec ) if ( $mxrec );
-		
-		# Check MX record for SPAMEXPERTS directly here
-		my $spamexperts_mx = ($mxrec =~ m/cloudmail0[1-4]\.clausweb\.ro/) ? 1 : 0;
-		my $exists_here = check_if_ip_on_server( $mxrec ) if ( $mxrec );
+    my $tcDomain = shift;
+    my @mxrecords = qx[ dig +short $tcDomain MX ];
+    for my $mx (@mxrecords) {
+        chomp($mx);
+        my ($priority, $mxrec) = (split(/\s+/, $mx));
+        return unless ($mxrec);
 
-		# Check if $mxrec is a valid IP
-		my $isValidIP = (Cpanel::Validate::IP::is_valid_ip($mxrec)) ? 1 : 0;
-		unless( $isValidIP ) {
-			# Get A record of $mxrec
-			print BOLD BLUE "\t\\_ MX Record: $mxrec\n";
-			my @arecords = qx[ dig +short $mxrec A ];
-			for my $arecord(@arecords ) {
-				chomp( $arecord );
-				my $exists_here = check_if_ip_on_server( $arecord ) if ( $arecord );
-				if ( $arecord =~ m/[0-9\.]/ ) {
-					print YELLOW "\t\t\\_ A Record: $arecord - $exists_here\n" unless( $arecord =~ m/[a-z]/ );
-				}
-				if ( $arecord =~ m/[a-z].*/ ) {
-					print YELLOW "\t\t\\_ CNAME Record: $arecord - $exists_here\n" unless( $arecord =~ m/[0-9]/ );
-				}
-				print RED "\t\t\\_ No A record found\n" unless( $arecord );
-			}
-		}
-	}
+        # Check if the MX record is from Clausweb cloudmail
+        my $spamexperts_mx = ($mxrec =~ m/cloudmail0[1-4]\.clausweb\.ro/) ? 1 : 0;
+
+        my $exists_here = check_if_ip_on_server($mxrec, $spamexperts_mx) if ($mxrec);
+        
+        # Check if $mxrec is a valid IP
+        my $isValidIP = (Cpanel::Validate::IP::is_valid_ip($mxrec)) ? 1 : 0;
+        unless ($isValidIP) {
+            # Get A record of $mxrec
+            print BOLD BLUE "\t\\_ MX Record: $mxrec\n";
+            my @arecords = qx[ dig +short $mxrec A ];
+            for my $arecord (@arecords) {
+                chomp($arecord);
+                my $exists_here = check_if_ip_on_server($arecord, $spamexperts_mx) if ($arecord);
+                if ($arecord =~ m/[0-9\.]/) {
+                    print YELLOW "\t\t\\_ A Record: $arecord - $exists_here\n" unless ($arecord =~ m/[a-z]/);
+                }
+                if ($arecord =~ m/[a-z].*/) {
+                    print YELLOW "\t\t\\_ CNAME Record: $arecord - $exists_here\n" unless ($arecord =~ m/[0-9]/);
+                }
+                print RED "\t\t\\_ No A record found\n" unless ($arecord);
+            }
+        }
+    }
 }
 
 sub check_if_ip_on_server {
-	my ($tcArecord, $spamexperts_mx) = @_;
+    my ($tcArecord, $spamexperts_mx) = @_;
 
-	# If spamexperts_mx is set, this means the MX record is from Clausweb
-	if ( $spamexperts_mx ) {
-		return BOLD CYAN " [ SPAMEXPERTS ]";
-	}
+    # If spamexperts_mx is set, this means the MX record is from Clausweb
+    if ($spamexperts_mx) {
+        return BOLD CYAN " [ SPAMEXPERTS ]";
+    }
 
-	my $isCloudFlare = check_cloudflare_ips($tcArecord);
-	if ( $isCloudFlare ) {
-		return BOLD YELLOW " [ CloudFlare IP ]";
-	}
+    my $isCloudFlare = check_cloudflare_ips($tcArecord);
+    if ($isCloudFlare) {
+        return BOLD YELLOW " [ CloudFlare IP ]";
+    }
 
-	my $exists = ( grep { /$tcArecord/ } @ips );
-	return BOLD GREEN " [ HOSTED HERE ]" if ($exists);
-	return MAGENTA " [ HOSTED ELSEWHERE ]";
+    my $exists = (grep { /$tcArecord/ } @ips);
+    return BOLD GREEN " [ HOSTED HERE ]" if ($exists);
+    return MAGENTA " [ HOSTED ELSEWHERE ]";
 }
 
 sub check_for_dns_error {
-	my $tcDomain = shift;
-	my $geterror = qx[ dig $tcDomain +noall +comments +noedns | grep 'status:' | cut -d ' ' -f6 | tr -d , ];
-	chomp( $geterror );
-	return if ( $geterror eq 'NOERROR' );
-	print RED "DNS Error:  $geterror\n";;
-	print "=" x 80;
-	print "\n";
+    my $tcDomain = shift;
+    my $geterror = qx[ dig $tcDomain +noall +comments +noedns | grep 'status:' | cut -d ' ' -f6 | tr -d , ];
+    chomp($geterror);
+    return if ($geterror eq 'NOERROR');
+    print RED "DNS Error:  $geterror\n";
+    print "=" x 80;
+    print "\n";
 }
 
 sub check_cloudflare_ips {
     my $chkIP = shift;
     chomp($chkIP);
-    my $url = URI->new( 'https://www.cloudflare.com/ips-v4' );
-    my $ua  = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
+    my $url = URI->new('https://www.cloudflare.com/ips-v4');
+    my $ua  = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });
     $ua->agent("");
     my $res = $ua->get($url);
-    my $cf_subnets  = $res->decoded_content;
-    my @cf_subnets  = split /\n/, $cf_subnets;
+    my $cf_subnets = $res->decoded_content;
+    my @cf_subnets = split /\n/, $cf_subnets;
     foreach my $cf_subnet (@cf_subnets) {
         chomp($cf_subnet);
         my $network = NetAddr::IP->new($cf_subnet);
-        my $ip      = NetAddr::IP->new($chkIP);
-        if ( $ip->within($network) ) {
+        my $ip = NetAddr::IP->new($chkIP);
+        if ($ip->within($network)) {
             return 1;
         }
     }
 }
 
 sub get_domain_type {
-	my $tcDomain = shift;
-	my ($domain_type)=(split(/\s+/,qx[ whmapi1 get_domain_info | grep -A1 $tcDomain | grep 'domain_type' ] ))[2];
-	chomp($domain_type);
-	return $domain_type;
+    my $tcDomain = shift;
+    my ($domain_type) = (split(/\s+/, qx[ whmapi1 get_domain_info | grep -A1 $tcDomain | grep 'domain_type' ]))[2];
+    chomp($domain_type);
+    return $domain_type;
 }
