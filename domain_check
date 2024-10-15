@@ -96,10 +96,17 @@ sub get_mx_record {
 
 sub check_if_ip_on_server {
 	my $tcArecord = shift;
+
+	# Check if the MX record matches SPAMEXPERTS (Clausweb MX records)
+	if ( $tcArecord =~ m/cloudmail0[1-4]\.clausweb\.ro/ ) {
+		return BOLD CYAN " [ SPAMEXPERTS ]";
+	}
+
 	my $isCloudFlare = check_cloudflare_ips($tcArecord);
 	if ( $isCloudFlare ) {
 		return BOLD YELLOW " [ CloudFlare IP ]" if ( $isCloudFlare );
 	}
+
 	my $exists = ( grep { /$tcArecord/ } @ips );
 	return BOLD GREEN " [ HOSTED HERE ]" if ($exists);
 	return MAGENTA " [ HOSTED ELSEWHERE ]";
