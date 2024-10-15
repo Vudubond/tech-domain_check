@@ -73,6 +73,11 @@ sub get_mx_record {
 		my ( $priority, $mxrec ) = ( split( /\s+/, $mx ));
 		return unless( $mxrec );
 		my $exists_here = check_if_ip_on_server( $mxrec ) if ( $mxrec );
+		
+		# Check MX record for SPAMEXPERTS directly here
+		my $spamexperts_mx = ($mxrec =~ m/cloudmail0[1-4]\.clausweb\.ro/) ? 1 : 0;
+		my $exists_here = check_if_ip_on_server( $mxrec ) if ( $mxrec );
+
 		# Check if $mxrec is a valid IP
 		my $isValidIP = (Cpanel::Validate::IP::is_valid_ip($mxrec)) ? 1 : 0;
 		unless( $isValidIP ) {
@@ -95,10 +100,10 @@ sub get_mx_record {
 }
 
 sub check_if_ip_on_server {
-	my ($tcArecord, $mxrec) = @_;
+	my ($tcArecord, $spamexperts_mx) = @_;
 
-	# Check if the MX record matches SPAMEXPERTS (Clausweb MX records)
-	if ( $mxrec =~ m/cloudmail0[1-4]\.clausweb\.ro/ ) {
+	# If spamexperts_mx is set, this means the MX record is from Clausweb
+	if ( $spamexperts_mx ) {
 		return BOLD CYAN " [ SPAMEXPERTS ]";
 	}
 
